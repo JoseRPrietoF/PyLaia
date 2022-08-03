@@ -51,6 +51,7 @@ def run(
 
     # load the non-pytorch_lightning model
     model = loader.load()
+    # print(model)
     assert (
         model is not None
     ), "Could not find the model. Have you run pylaia-htr-create-model?"

@@ -3,10 +3,12 @@ from dataclasses import dataclass, field, make_dataclass
 from distutils.version import LooseVersion
 from enum import Enum
 from os.path import join
-from typing import Any, List, Optional, Tuple, Type, Union
+from typing import Any, List, Optional, Tuple, Type, Union, Dict, AnyStr
 
+from laia.models.htr.cnv_model import PadPool
 import pytorch_lightning as pl
 import torch
+from torch import nn
 from jsonargparse.typing import (
     ClosedUnitInterval,
     NonNegativeFloat,
@@ -163,6 +165,86 @@ class CreateCRNNArgs:
                 raise ValueError(f"{l} ({type(l)}) is neither a tuple nor an int")
         return parsed
 
+@dataclass
+class CreateOrigamiNetArgs:
+    """Create OrigamiNet arguments
+    Original code: https://github.com/IntuitionMachines/OrigamiNet
+    From paper: OrigamiNet: Weakly-Supervised, Segmentation-Free, One-Step, Full Page TextRecognition by learning to unfold - CVPR 2020
+
+    Args:
+        num_input_channels: Number of channels of the input images
+        lszs: Number of channels for each layer, this is a dictionary of format leyer_id:channels, unspecified layers are assumed constant
+        lreszs: Resampling stages in the model
+        GradCheck: Whether or not to use gradient checkpointing
+            0 disabled
+            1 enabled, light version which offers good memory saving with small slowdown
+            2 enabled, higher memory saving, but noticeably slower than 1
+        reduceAxis: Final axis of reduction. 2 to use line by line
+        wmul: Channel multipler, numer of channels in each channel will be multiplied by this value
+        nlyrs:  #layers in the GTR model
+        fup: 33
+    """
+
+    num_input_channels: PositiveInt = 1
+    lszs: List[List[NonNegativeInt]] = field(
+        default_factory=lambda: [[0,128], [2,256], [4,512], [6,1024]]
+    )
+    lreszs: List[List[Union[NonNegativeInt, str]]] = field(
+        default_factory=lambda: [[0, "MaxPool2d"],[2, "MaxPool2d"]]
+    )
+    # lszs: Dict[int, int] = field(
+    #     # default_factory=lambda: [16, 16, 32, 32]
+    #     default_factory=lambda: {0:  128,
+    #         2:  256,
+    #         4:  512,
+    #         6:  1024}
+    # )
+    # lreszs: Dict[int, nn.Module] = field(
+    #     default_factory=lambda: {
+    #               0: nn.MaxPool2d((2,2)),
+    #               2: nn.MaxPool2d((2,2)),
+    #         }
+    # )
+    GradCheck: PositiveInt = 2
+    reduceAxis: PositiveInt = 2
+    wmul: PositiveFloat = 2.0
+    nlyrs: PositiveInt = 12
+    fup: PositiveInt = 33
+
+    def __post_init__(self):
+        self.lszs = self.parse_parameter(self.lszs)
+        self.lreszs = self.parse_parameter(self.lreszs)
+        # self.cnn_stride = self.parse_parameter(self.cnn_stride)
+        # self.cnn_dilation = self.parse_parameter(self.cnn_dilation)
+        # self.cnn_poolsize = self.parse_parameter(self.cnn_poolsize)
+    
+    @staticmethod
+    def parse_parameter(
+        layers:  List[List[NonNegativeInt]]
+    ) -> Dict:
+        parsed = {}
+        for l in layers:
+            if isinstance(l, (tuple, list)):
+                # if not all(isinstance(v, int) for v in l):
+                #     raise ValueError(f"An element of {layers} is not an int")
+                pos, value = l
+                if not isinstance(pos, int):
+                    raise ValueError(f"An element of {layers} is not an int in first position")
+                if isinstance(value, int):
+                    parsed[pos] = value
+                elif isinstance(value, str):
+                    if value == "MaxPool2d":
+                        parsed[pos] = nn.MaxPool2d((2,2))
+                    elif value == "PadPool":
+                        parsed[pos] = PadPool((2,2))
+                    elif "Upsample" in value:
+                        s1,s2 = value.split("Upsample")[0].split(",")
+                        parsed[pos] = nn.Upsample(size = (int(s1),int(s2)), mode = 'bilinear', align_corners = True)
+                else:
+                    raise ValueError(f"An element of {layers} is not known in second position")
+            else:
+                raise ValueError(f"{l} ({type(l)}) is not a tuple")
+        return parsed
 
 @dataclass
 class DataArgs:

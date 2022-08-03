@@ -119,11 +119,12 @@ class LaiaCRNN(nn.Module):
         x = self.dropout(x, p=self._rnn_dropout)
         x, _ = self.rnn(x)
         x = self.dropout(x, p=self._lin_dropout)
-        return (
-            PackedSequence(self.linear(x.data), x.batch_sizes)
-            if isinstance(x, PackedSequence)
-            else self.linear(x)
-        )
+        if isinstance(x, PackedSequence):
+            x = PackedSequence(self.linear(x.data), x.batch_sizes)
+        else:
+            self.linear(x)
+        print(x)
+        return x
 
     @staticmethod
     def get_conv_output_size(
