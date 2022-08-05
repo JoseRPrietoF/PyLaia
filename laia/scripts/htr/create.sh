@@ -1,13 +1,13 @@
 GradCheck=2
 reduceAxis=2
 wmul=2.0
-nlyrs=6
+nlyrs=4
 height=96
 use_distortions=true
-lszs=[[0,64],[2,128],[4,256],[6,512]]
+lszs=[[0,64],[2,128],[4,256]]
 # lreszs=[[0,MaxPool2d],[2,MaxPool2d]]
 lreszs=[[0,MaxPool2d]]
-output_dir=work_small
+output_dir=work_small3
 model=origaminet
 python create_model.py \
 --logging.filepath ${output_dir}/train.log \

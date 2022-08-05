@@ -7,10 +7,11 @@ from jsonargparse.typing import NonNegativeInt
 from pytorch_lightning import seed_everything
 
 import laia.common.logging as log
-from laia.common.arguments import CommonArgs, CreateCRNNArgs, CreateOrigamiNetArgs
+from laia.common.arguments import CommonArgs, CreateCRNNArgs, CreateOrigamiNetArgs, CreateSPANArgs
 from laia.common.saver import ModelSaver
 from laia.models.htr import LaiaCRNN
-from laia.models.htr.cnv_model import OrigamiNet, PadPool
+from laia.models.htr.SPAN import SPAN_lines
+from laia.models.htr.cnv_model import OrigamiNet
 from laia.scripts.htr import common_main
 from laia.utils import SymbolsTable
 
@@ -21,6 +22,7 @@ def run(
     common: CommonArgs = CommonArgs(),
     crnn: CreateCRNNArgs = CreateCRNNArgs(),
     origaminet: CreateOrigamiNetArgs = CreateOrigamiNetArgs(),
+    span: CreateSPANArgs = CreateSPANArgs(),
     save_model: bool = False,
     model: str = "pylaia"
 ) -> LaiaCRNN:
@@ -28,6 +30,7 @@ def run(
 
     crnn.num_output_labels = len(SymbolsTable(syms))
     origaminet.num_output_labels = len(SymbolsTable(syms))
+    span.num_output_labels = len(SymbolsTable(syms))
     if crnn is not None:
         if fixed_input_height:
             conv_output_size = LaiaCRNN.get_conv_output_size(
@@ -50,21 +53,10 @@ def run(
     if model == "pylaia":
         model_net = LaiaCRNN(**vars(crnn))
     elif model == "origaminet":
-
-        # lszs={0:  128,
-        #     2:  256,
-        #     4:  512,
-        #     6:  1024}
-        # lreszs={
-        #           0: nn.MaxPool2d((2,2)),
-        #           2: nn.MaxPool2d((2,2)),
-        #     }
-        # GradCheck=0
-        # reduceAxis=2
-        # wmul=2.0
-        # nlyrs=12
-        # fup=33
         model_net = OrigamiNet(**vars(origaminet))
+        print(model_net)
+    elif model == "span_lines":
+        model_net = SPAN_lines(**vars(span))
         print(model_net)
     else:
         raise Exception(f"Model {common.model} not supported.")
@@ -113,7 +105,8 @@ def get_args(argv: Optional[List[str]] = None) -> Dict[str, Any]:
         type=str,
         default="pylaia",
         help=(
-            "Type of model. pylaia by default."
+            "Type of model. pylaia by default. "
+            "Models supported: pylaia origaminet span_lines"
         ),
     )
     parser.add_argument(
@@ -147,12 +140,14 @@ def get_args(argv: Optional[List[str]] = None) -> Dict[str, Any]:
     parser.add_function_arguments(log.config, "logging")
     parser.add_class_arguments(CreateCRNNArgs, "crnn")
     parser.add_class_arguments(CreateOrigamiNetArgs, "origaminet")
+    parser.add_class_arguments(CreateSPANArgs, "span")
 
     args = parser.parse_args(argv, with_meta=False)
 
     args["common"] = CommonArgs(**args["common"])
     args["crnn"] = CreateCRNNArgs(**args["crnn"])
     args["origaminet"] = CreateOrigamiNetArgs(**args["origaminet"])
+    args["span"] = CreateSPANArgs(**args["span"])
 
     return args
 

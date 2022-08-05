@@ -1,5 +1,5 @@
-output_dir=work_small
-batch_size=3;
+output_dir=work_small3
+batch_size=2;
 learning_rate=0.002;
 max_epochs=500;
 use_distortions=true;
